@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum StockMovementType {
+  IN // stock entra: compras a proveedor, devoluciones de cliente
+  OUT // stock sale: venta facturada, merma dada de baja
+  ADJUSTMENT // conteo físico / corrección manual (puede ser + o -)
+}
+
+enum PaymentTerms {
+  DUE_ON_RECEIPT
+  NET_15
+  NET_30
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  VOID
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo e inventario
+// ---------------------------------------------------------------------------
+
+model Product {
+  id            String   @id @default(cuid())
+  sku           String   @unique
+  name          String
+  description   String?
+  // Dinero siempre en Decimal (nunca Float) para evitar errores de
+  // redondeo de punto flotante en costos/precios.
+  unitCost      Decimal  @db.Decimal(10, 2)
+  unitPrice     Decimal  @db.Decimal(10, 2)
+  // Cache del stock actual. La fuente de verdad son los StockMovement;
+  // este campo se recalcula a partir de ellos (ver explicación de flujo).
+  currentStock  Int      @default(0)
+  reorderPoint  Int      @default(0)
+  isTaxable     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  stockMovements StockMovement[]
+  invoiceItems   InvoiceItem[]
+
+  @@index([name])
+}
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  product      Product           @relation(fields: [productId], references: [id])
+  productId    String
+  type         StockMovementType
+  // Siempre positiva; el signo efectivo (sumar o restar a currentStock)
+  // lo determina `type`, no el valor de quantity.
+  quantity     Int
+  // Texto libre para trazabilidad: número de invoice, número de PO, etc.
+  reference    String?
+  note         String?
+  movementDate DateTime          @default(now())
+  createdAt    DateTime          @default(now())
+
+  @@index([productId, movementDate])
+}
+
+// ---------------------------------------------------------------------------
+// Clientes
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id            String        @id @default(cuid())
+  name          String
+  email         String?       @unique
+  phone         String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  zip           String?
+  country       String        @default("US")
+  isTaxExempt   Boolean       @default(false)
+  paymentTerms  PaymentTerms  @default(DUE_ON_RECEIPT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  invoices Invoice[]
+
+  @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Facturación
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  customerId    String
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  // subtotal = suma de item.lineTotal (sin impuesto)
+  subtotal      Decimal       @db.Decimal(10, 2)
+  // tasa aplicada en el momento de emitir, ej. 0.0825 = 8.25%
+  taxRate       Decimal       @db.Decimal(6, 4)
+  taxAmount     Decimal       @db.Decimal(10, 2)
+  // total = subtotal + taxAmount
+  total         Decimal       @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items InvoiceItem[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  // Nullable: permite líneas de servicio/texto libre sin producto de catálogo.
+  product     Product? @relation(fields: [productId], references: [id])
+  productId   String?
+  description String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  // lineTotal = quantity * unitPrice, guardado (no recalculado) para que
+  // el historial de la factura no cambie si el precio del producto cambia después.
+  lineTotal   Decimal  @db.Decimal(10, 2)
+
+  @@index([invoiceId])
+  @@index([productId])
+}

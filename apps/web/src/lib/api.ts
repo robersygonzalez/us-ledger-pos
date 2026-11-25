@@ -3,9 +3,11 @@ import type {
   CreateCustomerInput,
   CreateInvoiceInput,
   CreateProductInput,
+  FinancialSummaryReport,
   Invoice,
   InvoiceStatus,
   Product,
+  SalesTaxReport,
 } from "@us-ledger-pos/shared";
 
 const BASE_URL = "/api";
@@ -13,6 +15,22 @@ const BASE_URL = "/api";
 export interface AdjustStockInput {
   quantityDelta: number;
   note?: string;
+}
+
+export interface ReportDateRangeInput {
+  from?: string;
+  to?: string;
+}
+
+// El backend incluye el cliente relacionado en GET /invoices/:id.
+export type InvoiceDetail = Invoice & { customer: Customer };
+
+function toQueryString(params: ReportDateRangeInput) {
+  const entries = Object.entries(params).filter(
+    (entry): entry is [string, string] => entry[1] !== undefined,
+  );
+  if (entries.length === 0) return "";
+  return `?${new URLSearchParams(entries).toString()}`;
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -70,6 +88,7 @@ export const api = {
 
   invoices: {
     list: () => request<Invoice[]>("/invoices"),
+    get: (id: string) => request<InvoiceDetail>(`/invoices/${id}`),
     create: (data: CreateInvoiceInput) =>
       request<Invoice>("/invoices", {
         method: "POST",
@@ -80,5 +99,17 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ status }),
       }),
+  },
+
+  reports: {
+    financialSummary: (range?: ReportDateRangeInput) =>
+      request<FinancialSummaryReport>(
+        `/reports/financial-summary${toQueryString(range ?? {})}`,
+      ),
+    salesTax: (range?: ReportDateRangeInput) =>
+      request<SalesTaxReport>(
+        `/reports/sales-tax${toQueryString(range ?? {})}`,
+      ),
+    lowStockAlerts: () => request<Product[]>("/reports/low-stock-alerts"),
   },
 };

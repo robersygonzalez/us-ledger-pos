@@ -3,6 +3,7 @@ import { InvoiceStatus, type Customer, type Invoice } from "@us-ledger-pos/share
 import { api } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import StatusBadge from "../../components/StatusBadge";
+import InvoiceViewModal from "./InvoiceViewModal";
 
 // El backend incluye el cliente relacionado en /invoices y /invoices/:id.
 type InvoiceWithCustomer = Invoice & { customer: Customer };
@@ -26,6 +27,9 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(
+    null,
+  );
 
   async function load() {
     setLoading(true);
@@ -107,6 +111,13 @@ export default function InvoicesPage() {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setViewingInvoiceId(invoice.id)}
+                          className="btn-secondary"
+                        >
+                          Ver / Imprimir
+                        </button>
                         {NEXT_STATUSES[invoice.status].map((next) => (
                           <button
                             key={next}
@@ -128,6 +139,13 @@ export default function InvoicesPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewingInvoiceId && (
+        <InvoiceViewModal
+          invoiceId={viewingInvoiceId}
+          onClose={() => setViewingInvoiceId(null)}
+        />
       )}
     </div>
   );

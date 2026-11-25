@@ -3,15 +3,22 @@ import InventoryPage from "./features/inventory/InventoryPage";
 import CustomersPage from "./features/customers/CustomersPage";
 import InvoiceBuilderPage from "./features/invoices/InvoiceBuilderPage";
 import InvoicesPage from "./features/invoices/InvoicesPage";
+import ReportsPage from "./features/reports/ReportsPage";
 import { api } from "./lib/api";
 
-type Tab = "inventory" | "customers" | "new-invoice" | "invoices";
+type Tab =
+  | "inventory"
+  | "customers"
+  | "new-invoice"
+  | "invoices"
+  | "reports";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "inventory", label: "Inventario" },
   { id: "customers", label: "Clientes" },
   { id: "new-invoice", label: "Nueva Factura" },
   { id: "invoices", label: "Facturas" },
+  { id: "reports", label: "Reportes" },
 ];
 
 type ApiStatus = "checking" | "online" | "offline";
@@ -87,6 +94,7 @@ export default function App() {
           <InvoiceBuilderPage onCreated={() => setTab("invoices")} />
         )}
         {tab === "invoices" && <InvoicesPage />}
+        {tab === "reports" && <ReportsPage />}
       </main>
     </div>
   );

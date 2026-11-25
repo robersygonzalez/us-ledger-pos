@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { StockMovementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateProductDto } from "./dto/create-product.dto";
+import { AdjustStockDto } from "./dto/adjust-stock.dto";
 
 @Injectable()
 export class ProductsService {
@@ -39,5 +45,35 @@ export class ProductsService {
   async findLowStock() {
     const products = await this.prisma.product.findMany();
     return products.filter((p) => p.currentStock <= p.reorderPoint);
+  }
+
+  adjustStock(id: string, dto: AdjustStockDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { id } });
+      if (!product) {
+        throw new NotFoundException(`Product ${id} not found`);
+      }
+
+      const newStock = product.currentStock + dto.quantityDelta;
+      if (newStock < 0) {
+        throw new BadRequestException(
+          "El ajuste dejaría el stock en un valor negativo",
+        );
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          productId: id,
+          type: StockMovementType.ADJUSTMENT,
+          quantity: Math.abs(dto.quantityDelta),
+          note: dto.note,
+        },
+      });
+
+      return tx.product.update({
+        where: { id },
+        data: { currentStock: newStock },
+      });
+    });
   }
 }

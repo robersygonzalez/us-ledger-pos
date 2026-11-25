@@ -27,12 +27,15 @@ export interface Invoice {
   items: InvoiceItem[];
 }
 
-export type CreateInvoiceItemInput = Pick<
-  InvoiceItem,
-  "description" | "quantity" | "unitPrice"
-> &
-  Partial<Pick<InvoiceItem, "productId">>;
+export type CreateInvoiceItemInput = Pick<InvoiceItem, "quantity"> &
+  Partial<Pick<InvoiceItem, "productId" | "description" | "unitPrice">>;
 
 export type CreateInvoiceInput = Pick<Invoice, "customerId" | "dueDate"> & {
+  invoiceNumber: string;
+  // Ej. 0.0825 = 8.25%. La decide quien emite la factura (varía por
+  // jurisdicción); el backend solo la aplica a los items taxable.
+  taxRate: number;
+  issueDate?: string;
+  notes?: string;
   items: CreateInvoiceItemInput[];
 };

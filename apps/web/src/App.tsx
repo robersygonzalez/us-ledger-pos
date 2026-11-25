@@ -1,77 +1,92 @@
 import { useEffect, useState } from "react";
-import { PaymentTerms, type Product } from "@us-ledger-pos/shared";
+import InventoryPage from "./features/inventory/InventoryPage";
+import CustomersPage from "./features/customers/CustomersPage";
+import InvoiceBuilderPage from "./features/invoices/InvoiceBuilderPage";
+import InvoicesPage from "./features/invoices/InvoicesPage";
+import { api } from "./lib/api";
+
+type Tab = "inventory" | "customers" | "new-invoice" | "invoices";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "inventory", label: "Inventario" },
+  { id: "customers", label: "Clientes" },
+  { id: "new-invoice", label: "Nueva Factura" },
+  { id: "invoices", label: "Facturas" },
+];
 
 type ApiStatus = "checking" | "online" | "offline";
 
 export default function App() {
+  const [tab, setTab] = useState<Tab>("inventory");
   const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
-  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((res) => (res.ok ? setApiStatus("online") : setApiStatus("offline")))
+    api
+      .health()
+      .then(() => setApiStatus("online"))
       .catch(() => setApiStatus("offline"));
-
-    fetch("/api/products")
-      .then((res) => res.json())
-      .then((data: Product[]) => setProducts(data))
-      .catch(() => setProducts([]));
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-xl font-semibold">US Ledger POS</h1>
-        <p className="text-sm text-slate-500">
-          Facturación, ventas, stock y reportes
-        </p>
+      <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">US Ledger POS</h1>
+            <p className="text-sm text-slate-500">
+              Facturación, ventas, stock y reportes
+            </p>
+          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+              apiStatus === "online"
+                ? "bg-emerald-100 text-emerald-700"
+                : apiStatus === "offline"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                apiStatus === "online"
+                  ? "bg-emerald-500"
+                  : apiStatus === "offline"
+                    ? "bg-red-500"
+                    : "bg-slate-400"
+              }`}
+            />
+            {apiStatus === "checking" && "Verificando API..."}
+            {apiStatus === "online" && "API conectada"}
+            {apiStatus === "offline" && "API sin conexión"}
+          </span>
+        </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-6 p-6">
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="font-medium">Estado de la API</h2>
-          <p className="text-sm">
-            {apiStatus === "checking" && "Verificando..."}
-            {apiStatus === "online" && "✅ conectada (apps/api)"}
-            {apiStatus === "offline" && "⚠️ sin conexión (¿corriste npm run dev:api?)"}
-          </p>
-        </section>
+      <nav className="border-b border-slate-200 bg-white px-4 sm:px-6">
+        <div className="flex gap-1 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="font-medium">Productos</h2>
-          {products.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              Sin productos todavía (o la API no respondió).
-            </p>
-          ) : (
-            <ul className="mt-2 divide-y divide-slate-100 text-sm">
-              {products.map((p) => (
-                <li key={p.id} className="flex justify-between py-1">
-                  <span>{p.name}</span>
-                  <span className="text-slate-500">stock: {p.currentStock}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="font-medium">Términos de pago disponibles</h2>
-          <p className="text-sm text-slate-500">
-            Tipos importados desde @us-ledger-pos/shared, los mismos que usa
-            la API y la base de datos.
-          </p>
-          <ul className="mt-2 flex gap-2 text-sm">
-            {Object.values(PaymentTerms).map((term) => (
-              <li
-                key={term}
-                className="rounded bg-slate-100 px-2 py-1 font-mono text-xs"
-              >
-                {term}
-              </li>
-            ))}
-          </ul>
-        </section>
+      <main className="mx-auto max-w-5xl p-4 sm:p-6">
+        {tab === "inventory" && <InventoryPage />}
+        {tab === "customers" && <CustomersPage />}
+        {tab === "new-invoice" && (
+          <InvoiceBuilderPage onCreated={() => setTab("invoices")} />
+        )}
+        {tab === "invoices" && <InvoicesPage />}
       </main>
     </div>
   );

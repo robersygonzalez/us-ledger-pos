@@ -28,6 +28,7 @@ export class CreateInvoiceDto {
 
   // Ej. 0.0825 = 8.25%. La tarifa la decide quien emite la factura
   // (varía por jurisdicción); el servicio solo la aplica.
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   @Max(1)

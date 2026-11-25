@@ -133,9 +133,19 @@ export class InvoicesService {
         throw new NotFoundException(`Invoice ${id} not found`);
       }
 
+      const wasStockDeducted = STOCK_DEDUCTED_STATUSES.includes(
+        invoice.status,
+      );
       const shouldDeductStock =
-        !STOCK_DEDUCTED_STATUSES.includes(invoice.status) &&
-        STOCK_DEDUCTED_STATUSES.includes(dto.status);
+        !wasStockDeducted && STOCK_DEDUCTED_STATUSES.includes(dto.status);
+      // Revierte solo si ESTA factura ya tenía el stock descontado (venía de
+      // SENT/PAID). Si venía de DRAFT nunca se descontó, así que no hay nada
+      // que revertir. Y si se llama VOID dos veces, la segunda vez
+      // invoice.status ya es VOID (no está en STOCK_DEDUCTED_STATUSES), por
+      // lo que esta condición queda en false: la reversión es idempotente
+      // igual que la deducción de arriba.
+      const shouldRevertStock =
+        wasStockDeducted && dto.status === InvoiceStatus.VOID;
 
       if (shouldDeductStock) {
         for (const item of invoice.items) {
@@ -154,6 +164,27 @@ export class InvoicesService {
           await tx.product.update({
             where: { id: item.productId },
             data: { currentStock: { decrement: item.quantity } },
+          });
+        }
+      }
+
+      if (shouldRevertStock) {
+        for (const item of invoice.items) {
+          if (!item.productId) continue;
+
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: StockMovementType.IN,
+              quantity: item.quantity,
+              reference: invoice.invoiceNumber,
+              note: `Invoice ${invoice.invoiceNumber} voided — stock reversal`,
+            },
+          });
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { currentStock: { increment: item.quantity } },
           });
         }
       }

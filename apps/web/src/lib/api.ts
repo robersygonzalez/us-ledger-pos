@@ -10,7 +10,11 @@ import type {
   SalesTaxReport,
 } from "@us-ledger-pos/shared";
 
-const BASE_URL = "/api";
+// En producción (Vercel) no hay proxy de Vite, así que VITE_API_URL debe
+// apuntar directo al backend (ej. "https://us-ledger-pos-api.onrender.com",
+// sin "/api" al final: las rutas de NestJS viven en la raíz, no bajo /api).
+// Sin esa variable, se asume dev local con el proxy de apps/web/vite.config.ts.
+const BASE_URL = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
 
 export interface AdjustStockInput {
   quantityDelta: number;
